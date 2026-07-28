@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --panel: rgba(255, 255, 255, 0.68);
+  --panel-strong: rgba(255, 255, 255, 0.84);
+  --ink: #101827;
+  --muted: #5f6778;
+  --line: rgba(255, 255, 255, 0.54);
+}
+
+.dark {
+  color-scheme: dark;
+  --panel: rgba(17, 24, 39, 0.56);
+  --panel-strong: rgba(17, 24, 39, 0.74);
+  --ink: #f8fafc;
+  --muted: #bac4d6;
+  --line: rgba(255, 255, 255, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(52, 211, 153, 0.48), transparent 29rem),
+    radial-gradient(circle at 75% 0%, rgba(251, 113, 133, 0.34), transparent 32rem),
+    linear-gradient(135deg, #f8fafc 0%, #dceafe 48%, #eef2ff 100%);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.28), transparent 30rem),
+    radial-gradient(circle at 82% 4%, rgba(244, 114, 182, 0.19), transparent 34rem),
+    linear-gradient(135deg, #111827 0%, #1f2937 50%, #020617 100%);
+}
+
+button, input, textarea, select {
+  font: inherit;
+}
+
+button, select, input, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(24px);
+}
+
+.glass-strong {
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  backdrop-filter: blur(26px);
+}
+
+.range {
+  accent-color: #0f766e;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+audio {
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
