@@ -133,12 +133,13 @@ export default function Home() {
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(0);
   const [volume, setVolume] = useState(0.9);
-  const [language, setLanguage] = useState("en-IN");
+  const [language, setLanguage] = useState("en-US");
   const [accent, setAccent] = useState("Neutral");
   const [autoPlayback, setAutoPlayback] = useState(false);
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [originalBlob, setOriginalBlob] = useState<Blob | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [silenceStop, setSilenceStop] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -213,6 +214,15 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      const preferred = navigator.language;
+      if (preferred && preferred !== language) {
+        setLanguage(preferred);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     transcriptRef.current = transcript;
@@ -300,10 +310,13 @@ export default function Home() {
 
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
-        const text = result[0].transcript;
-        latestConfidence = typeof result[0].confidence === "number" ? result[0].confidence : latestConfidence;
+        const alt = result[0];
+        if (!alt || typeof alt.transcript !== "string") continue;
+        const text = alt.transcript.trim();
+        if (!text) continue;
+        latestConfidence = typeof alt.confidence === "number" ? alt.confidence : latestConfidence;
         if (result.isFinal) finalText += `${text} `;
-        else interim += text;
+        else interim += `${text} `;
       }
 
       if (finalText) {
@@ -342,6 +355,11 @@ export default function Home() {
       toast.error(`Speech recognition: ${event.error}`);
     };
     recognition.onend = () => {
+      if (!transcriptRef.current && interimTranscriptRef.current.trim()) {
+        const fallback = interimTranscriptRef.current.trim();
+        setTranscript(fallback);
+        transcriptRef.current = fallback;
+      }
       setInterimTranscript("");
       if (isRecordingRef.current && !manualStopRef.current) {
         window.setTimeout(() => {
@@ -423,9 +441,44 @@ export default function Home() {
     [history, persistHistory, pickBrowserVoice]
   );
 
+  const transcribeWithServer = useCallback(async (blob: Blob) => {
+    if (typeof window === "undefined") return "";
+    const hasServer = !window.location.hostname.includes("github.io");
+    if (!hasServer) {
+      toast.error("Transcription fallback is unavailable on GitHub Pages. Use Chrome or Edge with browser speech recognition.");
+      return "";
+    }
+
+    const formData = new FormData();
+    formData.append("audio", blob, "recording.webm");
+    formData.append("language", language);
+    setIsTranscribing(true);
+
+    try {
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        toast.error(`Transcription service failed: ${error.error ?? response.statusText}`);
+        return "";
+      }
+
+      const data = await response.json();
+      return typeof data.text === "string" ? data.text.trim() : "";
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Server transcription failed.");
+      return "";
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [language]);
+
   const finishInstantRecording = useCallback(
-    (blob: Blob) => {
-      window.setTimeout(() => {
+    async (blob: Blob) => {
+      window.setTimeout(async () => {
         const instantTranscript = `${transcriptRef.current} ${interimTranscriptRef.current}`.trim();
         setStatus("Ready");
         if (instantTranscript) {
@@ -436,10 +489,19 @@ export default function Home() {
           return;
         }
 
+        const fallbackTranscript = await transcribeWithServer(blob);
+        if (fallbackTranscript) {
+          setTranscript(fallbackTranscript);
+          setInterimTranscript("");
+          toast.success("Transcript created from audio fallback.");
+          if (autoPlayback) void speakWithBrowser(fallbackTranscript, true, blob);
+          return;
+        }
+
         toast.error("No speech was detected. Use Chrome or Edge, allow microphone access, and keep this tab active while speaking.");
       }, 1000);
     },
-    [autoPlayback, speakWithBrowser]
+    [autoPlayback, speakWithBrowser, transcribeWithServer]
   );
 
   const startRecording = async () => {
