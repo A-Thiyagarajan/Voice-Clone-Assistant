@@ -42,6 +42,7 @@ type HistoryItem = {
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   lang: string;
   start: () => void;
   stop: () => void;
@@ -282,6 +283,11 @@ export default function Home() {
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
+    if (typeof (recognition as SpeechRecognitionLike).maxAlternatives === "undefined") {
+      (recognition as SpeechRecognitionLike).maxAlternatives = 1;
+    } else {
+      recognition.maxAlternatives = 1;
+    }
     recognition.lang = language;
     recognition.onstart = () => setStatus("Listening...");
     recognition.onaudiostart = () => setStatus("Listening...");
@@ -319,6 +325,18 @@ export default function Home() {
     recognition.onerror = (event) => {
       if (event.error === "no-speech") {
         toast("No speech detected yet. Keep the tab active and speak clearly.");
+        return;
+      }
+      if (event.error === "audio-capture") {
+        toast.error("Microphone capture failed. Allow mic access and refresh the page.");
+        return;
+      }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        toast.error("Speech recognition permission denied. Enable microphone access and try again.");
+        return;
+      }
+      if (event.error === "network") {
+        toast.error("Speech recognition network error. Check your connection and try again.");
         return;
       }
       toast.error(`Speech recognition: ${event.error}`);
@@ -435,9 +453,7 @@ export default function Home() {
       manualStopRef.current = false;
       instantUnavailableRef.current = false;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true, channelCount: 1 }
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       startAudioMeter(stream);
       chunksRef.current = [];
