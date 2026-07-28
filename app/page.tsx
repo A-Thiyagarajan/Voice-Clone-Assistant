@@ -17,8 +17,10 @@ import {
   MdRefresh,
   MdReplay,
   MdSave,
+  MdSettings,
   MdShare,
-  MdStop
+  MdStop,
+  MdExpandMore
 } from "react-icons/md";
 
 type AppStatus = "Idle" | "Listening..." | "Ready" | "Playing";
@@ -141,6 +143,8 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [silenceStop, setSilenceStop] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -563,95 +567,152 @@ export default function Home() {
   return (
     <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8 lg:py-7">
       <Toaster position="top-right" toastOptions={{ className: "dark:bg-slate-900 dark:text-white" }} />
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 pb-24 sm:gap-7 lg:pb-0">
-        <header className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-600 dark:text-sky-400 sm:text-sm">Instant voice workspace</p>
-              <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">Voice Clone Assistant</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-                Record audio from your browser, get instant live transcripts, and play back voice with polished browser speech synthesis.
-              </p>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-24 sm:gap-7 lg:pb-0">
+        <header className="sticky top-4 z-30 glass rounded-[28px] border-white/10 bg-slate-950/85 p-4 shadow-glass backdrop-blur-xl dark:border-white/10 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-12 w-12 place-items-center rounded-3xl bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-300/20">
+                <MdMic className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Voice AI Studio</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Voice Clone Assistant</h1>
+              </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <StatusPill label={status} className={statusTone} />
-                <StatusPill label={formatTime(seconds)} className="bg-slate-950/10 font-mono text-slate-900 dark:bg-white/10 dark:text-white" />
-              </div>
-              <div className="flex flex-wrap items-center gap-3 justify-end">
-                <StatusPill label={`${Math.round(micLevel * 100)}% mic`} className="bg-sky-500/15 text-sky-900 dark:text-sky-200" />
-                <button
-                  type="button"
-                  onClick={() => setDarkMode((value) => !value)}
-                  className="glass-strong inline-flex h-12 w-12 items-center justify-center rounded-3xl text-2xl text-slate-800 transition hover:scale-[1.03] dark:text-white"
-                  aria-label="Toggle dark mode"
-                  title="Toggle dark mode"
-                >
-                  {darkMode ? <MdLightMode /> : <MdDarkMode />}
-                </button>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setDarkMode((value) => !value)}
+                className="glass-strong inline-flex h-11 w-11 items-center justify-center rounded-3xl text-xl text-white transition hover:bg-white/10"
+                aria-label="Toggle dark mode"
+                title="Toggle dark mode"
+              >
+                {darkMode ? <MdLightMode /> : <MdDarkMode />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((value) => !value)}
+                className="glass-strong inline-flex h-11 w-11 items-center justify-center rounded-3xl text-xl text-white transition hover:bg-white/10"
+                aria-label="Open settings"
+                title="Open settings"
+              >
+                <MdSettings />
+              </button>
             </div>
           </div>
         </header>
 
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.4fr_0.9fr]">
-          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
-            <div className="grid grid-cols-2 gap-3">
-              <Metric label="Status" value={status} />
-              <Metric label="Timer" value={formatTime(seconds)} />
-            </div>
-
-            <div className="my-6 flex justify-center sm:my-8">
-              <button
-                type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`relative flex h-36 w-36 items-center justify-center rounded-full text-6xl text-white shadow-2xl transition focus:outline-none focus:ring-4 focus:ring-cyan-300 sm:h-44 sm:w-44 ${
-                  isRecording ? "bg-rose-500 animate-soft-pulse" : "bg-cyan-600 hover:scale-[1.03]"
-                }`}
-                aria-label={isRecording ? "Stop recording" : "Start recording"}
-              >
-                {isRecording ? <span className="absolute inset-0 rounded-full border-8 border-white/20" /> : null}
-                <MdMic />
-              </button>
-            </div>
-
-            <div className="glass-strong rounded-[28px] p-4">
-              <div className="mb-3 flex items-center gap-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                <MdGraphicEq className="text-2xl text-cyan-500 dark:text-sky-400" />
-                Mic input
-                <span className="ml-auto font-mono text-xs text-slate-500 dark:text-slate-400">{Math.round(micLevel * 100)}%</span>
+          <motion.aside
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-[36px] border-white/10 p-5 shadow-glass dark:border-white/10 sm:p-6"
+          >
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Recording Status</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">{status}</h2>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10">
+                  <MdRadioButtonChecked className="h-4 w-4 text-cyan-300" />
+                  {formatTime(seconds)}
+                </div>
               </div>
-              <div className="flex h-24 items-center justify-center gap-1 overflow-hidden rounded-3xl bg-slate-950/10 px-3 dark:bg-white/10 sm:h-28">
-                {Array.from({ length: 34 }).map((_, index) => (
-                  <motion.span
-                    key={index}
-                    animate={{ height: isRecording ? 10 + micLevel * (22 + ((index * 9) % 58)) : 10 }}
-                    transition={{ duration: 0.12 }}
-                    className="w-1.5 rounded-full bg-gradient-to-t from-cyan-400 via-sky-400 to-fuchsia-400"
+
+              <div className="rounded-[28px] bg-slate-950/80 p-4 ring-1 ring-white/10">
+                <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
+                  <span>Mic level</span>
+                  <span>{Math.round(micLevel * 100)}%</span>
+                </div>
+                <div className="mt-3 h-4 overflow-hidden rounded-full bg-white/5">
+                  <motion.div
+                    animate={{ width: `${Math.max(10, Math.min(100, Math.round(micLevel * 100)))}%` }}
+                    transition={{ duration: 0.15 }}
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-fuchsia-400"
                   />
-                ))}
+                </div>
+              </div>
+
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-500 text-white shadow-[0_35px_90px_rgba(34,211,238,0.22)] transition-all duration-300 ease-out sm:h-28 sm:w-28">
+                <button
+                  type="button"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`relative flex h-20 w-20 items-center justify-center rounded-full text-4xl transition focus:outline-none focus:ring-4 focus:ring-cyan-300 sm:h-24 sm:w-24 ${
+                    isRecording ? "animate-pulse-fast bg-rose-500" : "bg-cyan-500 hover:bg-cyan-400"
+                  }`}
+                  aria-label={isRecording ? "Stop recording" : "Start recording"}
+                >
+                  {isRecording ? <MdStop className="h-8 w-8" /> : <MdMic className="h-8 w-8" />}
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={play}
+                  disabled={!hasTranscript}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <MdPlayArrow className="h-5 w-5" />
+                  Play
+                </button>
+                <button
+                  type="button"
+                  onClick={stop}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  <MdStop className="h-5 w-5" />
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  onClick={pause}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  <MdPause className="h-5 w-5" />
+                  Pause
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { stop(); play(); }}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  <MdReplay className="h-5 w-5" />
+                  Replay
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadAudio}
+                  disabled={!originalBlob}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <MdDownload className="h-5 w-5" />
+                  Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void shareAudio()}
+                  disabled={!originalBlob}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <MdShare className="h-5 w-5" />
+                  Share
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-3xl bg-white/5 p-4 text-sm text-slate-300">
+                  <span>Silence stop</span>
+                  <input className="h-5 w-5 accent-cyan-400" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
+                </div>
+                <div className="flex items-center justify-between rounded-3xl bg-white/5 p-4 text-sm text-slate-300">
+                  <span>Auto playback</span>
+                  <input className="h-5 w-5 accent-cyan-400" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
+                </div>
               </div>
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <IconButton icon={<MdPlayArrow />} label="Start" onClick={startRecording} disabled={isRecording} />
-              <IconButton icon={<MdStop />} label="Stop" onClick={stopRecording} disabled={!isRecording} />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <IconButton icon={<MdDownload />} label="Save Recording" onClick={downloadAudio} disabled={!originalBlob} />
-              <IconButton icon={<MdShare />} label="Share Recording" onClick={() => void shareAudio()} disabled={!originalBlob} />
-            </div>
-
-            <label className="mt-5 flex items-center justify-between gap-3 rounded-3xl bg-white/40 p-4 text-sm font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-300">
-              Silence stop
-              <input className="h-5 w-5 accent-cyan-500" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
-            </label>
-            <label className="mt-3 flex items-center justify-between gap-3 rounded-3xl bg-white/40 p-4 text-sm font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-300">
-              Auto playback
-              <input className="h-5 w-5 accent-cyan-500" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
-            </label>
           </motion.aside>
 
           <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[28px] p-4 sm:p-5">
@@ -697,55 +758,105 @@ export default function Home() {
             </button>
           </motion.section>
 
-          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
-            <h2 className="mb-4 text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Voice Settings</h2>
-            <div className="space-y-4">
+          <motion.aside
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="glass rounded-[36px] border-white/10 p-5 shadow-glass dark:border-white/10 sm:p-6"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Voice Settings</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Core controls plus hidden advanced tuning.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              >
+                <span>{advancedOpen ? "Hide advanced" : "Show advanced"}</span>
+                <MdExpandMore className={`h-5 w-5 transition ${advancedOpen ? "rotate-180" : "rotate-0"}`} />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
               <Select label="Voice" value={voice.value} onChange={(value) => setVoice(voices.find((item) => item.value === value) ?? voices[0])} options={voices.map((item) => ({ label: `${item.label} - ${item.category}`, value: item.value }))} />
               <Select label="Language" value={language} onChange={setLanguage} options={languages} />
               <Select label="Accent" value={accent} onChange={setAccent} options={accents.map((item) => ({ label: item, value: item }))} />
-              <Slider label="Playback speed" value={speed} min={0.25} max={4} step={0.05} onChange={setSpeed} suffix="x" />
-              <Slider label="Pitch" value={pitch} min={-12} max={12} step={1} onChange={setPitch} />
-              <Slider label="Volume" value={volume} min={0} max={1} step={0.01} onChange={setVolume} suffix="%" display={(value) => Math.round(value * 100)} />
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} />
-              <IconButton icon={<MdPause />} label="Pause" onClick={pause} />
-              <IconButton icon={<MdStop />} label="Stop" onClick={stop} />
-              <IconButton icon={<MdReplay />} label="Replay" onClick={() => { stop(); play(); }} />
-              <IconButton icon={<MdRefresh />} label="Resume" onClick={() => window.speechSynthesis.resume()} />
-              <IconButton icon={<MdDownload />} label="Recording" onClick={downloadAudio} />
-              <IconButton icon={<MdShare />} label="Share Rec" onClick={() => void shareAudio()} />
-            </div>
+            <AnimatePresence initial={false}>
+              {advancedOpen ? (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-5 space-y-4">
+                    <Slider label="Playback speed" value={speed} min={0.25} max={4} step={0.05} onChange={setSpeed} suffix="x" />
+                    <Slider label="Pitch" value={pitch} min={-12} max={12} step={1} onChange={setPitch} />
+                    <Slider label="Volume" value={volume} min={0} max={1} step={0.01} onChange={setVolume} suffix="%" display={(value) => Math.round(value * 100)} />
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </motion.aside>
         </section>
 
         <section className="glass rounded-[28px] p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-black">History</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Recording History</h2>
+              <p className="mt-1 text-sm text-slate-400">Recent transcripts and recordings for quick access.</p>
+            </div>
             <button
               type="button"
               onClick={() => persistHistory([])}
-              className="inline-flex items-center gap-2 rounded-full bg-white/45 px-3 py-2 text-sm font-bold dark:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
             >
-              <MdDelete /> Clear
+              <MdDelete /> Clear all
             </button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence initial={false}>
               {history.length === 0 ? (
-                <p className="text-sm text-slate-600 dark:text-slate-300">Completed recordings will appear here with transcript, original audio, and selected voice.</p>
+                <div className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 text-sm text-slate-400">
+                  Completed recordings will appear here with transcript, audio, and voice metadata.
+                </div>
               ) : (
                 history.map((item) => (
-                  <motion.article layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} key={item.id} className="glass-strong rounded-3xl p-4">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <p className="text-sm font-black">{new Date(item.date).toLocaleString()}</p>
-                      <span className="rounded-full bg-teal-500/15 px-2 py-1 text-xs font-bold text-teal-800 dark:text-teal-200">{item.selectedVoice}</span>
+                  <motion.article
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    key={item.id}
+                    className="glass-strong rounded-[28px] border border-white/10 p-5"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-300">Recording</p>
+                        <p className="mt-1 text-sm text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
+                      </div>
+                      <span className="rounded-2xl bg-cyan-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                        {item.selectedVoice}
+                      </span>
                     </div>
-                    <p className="line-clamp-3 text-sm text-slate-700 dark:text-slate-200">{item.transcript}</p>
-                    <div className="mt-3 space-y-2">
-                      {item.originalAudio ? <audio className="w-full" controls src={item.originalAudio} /> : null}
-                      {item.generatedAudio ? <audio className="w-full" controls src={item.generatedAudio} /> : null}
+                    <p className="line-clamp-3 text-sm leading-6 text-slate-300">{item.transcript}</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
+                        <MdPlayArrow className="h-4 w-4" /> Play
+                      </button>
+                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
+                        <MdDownload className="h-4 w-4" /> Download
+                      </button>
+                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
+                        <MdShare className="h-4 w-4" /> Share
+                      </button>
+                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
+                        <MdDelete className="h-4 w-4" /> Delete
+                      </button>
                     </div>
                   </motion.article>
                 ))
@@ -755,7 +866,7 @@ export default function Home() {
         </section>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-2 rounded-full border border-white/20 bg-white/90 p-3 shadow-glass backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/80 lg:hidden">
+      <div className="fixed inset-x-4 bottom-4 z-40 grid grid-cols-3 gap-3 rounded-full border border-white/10 bg-slate-950/95 p-3 shadow-glass backdrop-blur-2xl lg:hidden">
         <IconButton icon={isRecording ? <MdStop /> : <MdMic />} label={isRecording ? "Stop" : "Record"} onClick={isRecording ? stopRecording : startRecording} />
         <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} disabled={!hasTranscript} />
         <IconButton icon={<MdShare />} label="Share" onClick={() => void shareAudio()} disabled={!originalBlob} />
