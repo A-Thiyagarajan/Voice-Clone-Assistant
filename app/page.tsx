@@ -5,11 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   MdContentCopy,
-  MdDarkMode,
   MdDelete,
   MdDownload,
   MdGraphicEq,
-  MdLightMode,
   MdMic,
   MdPause,
   MdPlayArrow,
@@ -17,7 +15,6 @@ import {
   MdRefresh,
   MdReplay,
   MdSave,
-  MdSettings,
   MdShare,
   MdStop,
   MdExpandMore
@@ -143,7 +140,6 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [silenceStop, setSilenceStop] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -580,25 +576,10 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={() => setDarkMode((value) => !value)}
-                className="glass-strong inline-flex h-11 w-11 items-center justify-center rounded-3xl text-xl text-white transition hover:bg-white/10"
-                aria-label="Toggle dark mode"
-                title="Toggle dark mode"
-              >
-                {darkMode ? <MdLightMode /> : <MdDarkMode />}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((value) => !value)}
-                className="glass-strong inline-flex h-11 w-11 items-center justify-center rounded-3xl text-xl text-white transition hover:bg-white/10"
-                aria-label="Open settings"
-                title="Open settings"
-              >
-                <MdSettings />
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-3 self-start sm:self-auto">
+              <div className="rounded-3xl bg-slate-900/70 px-3 py-2 text-sm font-semibold text-slate-300">
+                Premium mode
+              </div>
             </div>
           </div>
         </header>
