@@ -5,7 +5,7 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
-    ignores: [".next/**", "node_modules/**", "dist/**"]
+    ignores: ["**/.next/**", "**/node_modules/**", "dist/**", "out/**", "Voice-Clone-Assistant/**"]
   }
 ];
 

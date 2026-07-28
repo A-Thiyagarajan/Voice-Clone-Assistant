@@ -5,9 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   MdContentCopy,
+  MdDarkMode,
   MdDelete,
   MdDownload,
   MdGraphicEq,
+  MdLightMode,
   MdMic,
   MdPause,
   MdPlayArrow,
@@ -16,8 +18,7 @@ import {
   MdReplay,
   MdSave,
   MdShare,
-  MdStop,
-  MdExpandMore
+  MdStop
 } from "react-icons/md";
 
 type AppStatus = "Idle" | "Listening..." | "Ready" | "Playing";
@@ -42,7 +43,6 @@ type HistoryItem = {
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
-  maxAlternatives?: number;
   lang: string;
   start: () => void;
   stop: () => void;
@@ -133,16 +133,16 @@ export default function Home() {
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(0);
   const [volume, setVolume] = useState(0.9);
-  const [language, setLanguage] = useState("en-US");
+  const [language, setLanguage] = useState("en-IN");
   const [accent, setAccent] = useState("Neutral");
   const [autoPlayback, setAutoPlayback] = useState(false);
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [originalBlob, setOriginalBlob] = useState<Blob | null>(null);
+  const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [silenceStop, setSilenceStop] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [recognitionNotice, setRecognitionNotice] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -164,6 +164,7 @@ export default function Home() {
   const estimatedSpeakingSeconds = Math.max(1, Math.round((words / 150) * 60));
   const characters = transcript.length;
   const hasTranscript = transcript.trim().length > 0;
+  const hasRecording = Boolean(originalBlob);
   const statusTone = status === "Listening..." ? "bg-rose-500/15 text-rose-700 dark:text-rose-200" : status === "Playing" ? "bg-teal-500/15 text-teal-800 dark:text-teal-200" : "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
 
   const persistHistory = useCallback((items: HistoryItem[]) => {
@@ -216,15 +217,6 @@ export default function Home() {
   }, [darkMode]);
 
   useEffect(() => {
-    if (typeof navigator !== "undefined") {
-      const preferred = navigator.language;
-      if (preferred && preferred !== language) {
-        setLanguage(preferred);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
 
@@ -260,9 +252,10 @@ export default function Home() {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       recognitionRef.current?.abort();
       window.speechSynthesis?.cancel();
+      if (originalAudioUrl) URL.revokeObjectURL(originalAudioUrl);
       stopAudioMeter();
     };
-  }, [stopAudioMeter]);
+  }, [originalAudioUrl, stopAudioMeter]);
 
   useEffect(() => {
     const loadVoices = () => setBrowserVoices(window.speechSynthesis?.getVoices() ?? []);
@@ -286,23 +279,18 @@ export default function Home() {
   const startBrowserRecognition = useCallback(() => {
     const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     if (!Recognition) {
-      toast.error("Speech detection needs Chrome or Edge for instant browser mode.");
+      setRecognitionNotice("Recording will work, but this browser does not provide speech-to-text here. You can still play, save, and share the recording.");
       return false;
     }
 
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    if (typeof (recognition as SpeechRecognitionLike).maxAlternatives === "undefined") {
-      (recognition as SpeechRecognitionLike).maxAlternatives = 1;
-    } else {
-      recognition.maxAlternatives = 1;
-    }
     recognition.lang = language;
     recognition.onstart = () => setStatus("Listening...");
     recognition.onaudiostart = () => setStatus("Listening...");
     recognition.onspeechstart = () => setStatus("Listening...");
-    recognition.onnomatch = () => toast("Audio was heard, but words were unclear. Try the closest language option.");
+    recognition.onnomatch = () => setRecognitionNotice("Audio was heard, but words were unclear. Try another language option or speak closer to the microphone.");
     recognition.onresult = (event) => {
       let finalText = "";
       let interim = "";
@@ -310,16 +298,14 @@ export default function Home() {
 
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
-        const alt = result[0];
-        if (!alt || typeof alt.transcript !== "string") continue;
-        const text = alt.transcript.trim();
-        if (!text) continue;
-        latestConfidence = typeof alt.confidence === "number" ? alt.confidence : latestConfidence;
+        const text = result[0].transcript;
+        latestConfidence = typeof result[0].confidence === "number" ? result[0].confidence : latestConfidence;
         if (result.isFinal) finalText += `${text} `;
-        else interim += `${text} `;
+        else interim += text;
       }
 
       if (finalText) {
+        setRecognitionNotice("");
         setTranscript((current) => {
           const next = `${current}${current.endsWith(" ") || !current ? "" : " "}${finalText}`.trimStart();
           transcriptRef.current = next;
@@ -337,29 +323,12 @@ export default function Home() {
     };
     recognition.onerror = (event) => {
       if (event.error === "no-speech") {
-        toast("No speech detected yet. Keep the tab active and speak clearly.");
+        setRecognitionNotice("No words detected yet. The recording is still being saved.");
         return;
       }
-      if (event.error === "audio-capture") {
-        toast.error("Microphone capture failed. Allow mic access and refresh the page.");
-        return;
-      }
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        toast.error("Speech recognition permission denied. Enable microphone access and try again.");
-        return;
-      }
-      if (event.error === "network") {
-        toast.error("Speech recognition network error. Check your connection and try again.");
-        return;
-      }
-      toast.error(`Speech recognition: ${event.error}`);
+      setRecognitionNotice(`Speech-to-text is limited here (${event.error}). Your recording will still be saved.`);
     };
     recognition.onend = () => {
-      if (!transcriptRef.current && interimTranscriptRef.current.trim()) {
-        const fallback = interimTranscriptRef.current.trim();
-        setTranscript(fallback);
-        transcriptRef.current = fallback;
-      }
       setInterimTranscript("");
       if (isRecordingRef.current && !manualStopRef.current) {
         window.setTimeout(() => {
@@ -374,7 +343,7 @@ export default function Home() {
     try {
       recognition.start();
     } catch {
-      toast.error("Speech recognition could not start. Try refreshing the page.");
+      setRecognitionNotice("Speech-to-text could not start here. Your recording will still be saved.");
       return false;
     }
     recognitionRef.current = recognition;
@@ -441,47 +410,13 @@ export default function Home() {
     [history, persistHistory, pickBrowserVoice]
   );
 
-  const transcribeWithServer = useCallback(async (blob: Blob) => {
-    if (typeof window === "undefined") return "";
-    const hasServer = !window.location.hostname.includes("github.io");
-    if (!hasServer) {
-      toast.error("Transcription fallback is unavailable on GitHub Pages. Use Chrome or Edge with browser speech recognition.");
-      return "";
-    }
-
-    const formData = new FormData();
-    formData.append("audio", blob, "recording.webm");
-    formData.append("language", language);
-    setIsTranscribing(true);
-
-    try {
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        body: formData
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: response.statusText }));
-        toast.error(`Transcription service failed: ${error.error ?? response.statusText}`);
-        return "";
-      }
-
-      const data = await response.json();
-      return typeof data.text === "string" ? data.text.trim() : "";
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Server transcription failed.");
-      return "";
-    } finally {
-      setIsTranscribing(false);
-    }
-  }, [language]);
-
   const finishInstantRecording = useCallback(
-    async (blob: Blob) => {
-      window.setTimeout(async () => {
+    (blob: Blob) => {
+      window.setTimeout(() => {
         const instantTranscript = `${transcriptRef.current} ${interimTranscriptRef.current}`.trim();
         setStatus("Ready");
         if (instantTranscript) {
+          setRecognitionNotice("");
           setTranscript(instantTranscript);
           setInterimTranscript("");
           toast.success("Instant transcript ready");
@@ -489,19 +424,11 @@ export default function Home() {
           return;
         }
 
-        const fallbackTranscript = await transcribeWithServer(blob);
-        if (fallbackTranscript) {
-          setTranscript(fallbackTranscript);
-          setInterimTranscript("");
-          toast.success("Transcript created from audio fallback.");
-          if (autoPlayback) void speakWithBrowser(fallbackTranscript, true, blob);
-          return;
-        }
-
-        toast.error("No speech was detected. Use Chrome or Edge, allow microphone access, and keep this tab active while speaking.");
+        setRecognitionNotice("Recording saved. Speech-to-text could not detect clear words, but you can play, save, or share the audio.");
+        toast.success("Recording saved");
       }, 1000);
     },
-    [autoPlayback, speakWithBrowser, transcribeWithServer]
+    [autoPlayback, speakWithBrowser]
   );
 
   const startRecording = async () => {
@@ -512,10 +439,15 @@ export default function Home() {
       setInterimTranscript("");
       setConfidence(null);
       setOriginalBlob(null);
+      if (originalAudioUrl) URL.revokeObjectURL(originalAudioUrl);
+      setOriginalAudioUrl(null);
+      setRecognitionNotice("");
       manualStopRef.current = false;
       instantUnavailableRef.current = false;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true, channelCount: 1 }
+      });
       streamRef.current = stream;
       startAudioMeter(stream);
       chunksRef.current = [];
@@ -527,22 +459,13 @@ export default function Home() {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setOriginalBlob(blob);
-        if (instantUnavailableRef.current) {
-          setStatus("Idle");
-          return;
-        }
+        setOriginalAudioUrl(URL.createObjectURL(blob));
         finishInstantRecording(blob);
       };
       mediaRecorderRef.current = recorder;
       recorder.start(500);
       if (!startBrowserRecognition()) {
         instantUnavailableRef.current = true;
-        stream.getTracks().forEach((track) => track.stop());
-        stopAudioMeter();
-        if (recorder.state === "recording") recorder.stop();
-        setIsRecording(false);
-        setStatus("Idle");
-        return;
       }
       setIsRecording(true);
       toast.success("Recording started");
@@ -550,6 +473,20 @@ export default function Home() {
       setStatus("Idle");
       toast.error(error instanceof Error ? error.message : "Microphone permission was denied.");
     }
+  };
+
+  const playRecording = () => {
+    if (!originalAudioUrl || !audioRef.current) {
+      toast.error("Record audio first.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    audioRef.current.src = originalAudioUrl;
+    audioRef.current.volume = volume;
+    audioRef.current.currentTime = 0;
+    audioRef.current.onplay = () => setStatus("Playing");
+    audioRef.current.onended = () => setStatus("Ready");
+    void audioRef.current.play();
   };
 
   const generateSpeech = async () => {
@@ -576,6 +513,8 @@ export default function Home() {
 
   const stop = () => {
     window.speechSynthesis.cancel();
+    audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.currentTime = 0;
     setStatus("Ready");
   };
 
@@ -641,146 +580,106 @@ export default function Home() {
   return (
     <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8 lg:py-7">
       <Toaster position="top-right" toastOptions={{ className: "dark:bg-slate-900 dark:text-white" }} />
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-24 sm:gap-7 lg:pb-0">
-        <header className="sticky top-4 z-30 glass rounded-[28px] border-white/10 bg-slate-950/85 p-4 shadow-glass backdrop-blur-xl dark:border-white/10 sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-3xl bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-300/20">
-                <MdMic className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Voice AI Studio</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Voice Clone Assistant</h1>
-              </div>
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 pb-24 sm:gap-5 lg:pb-0">
+        <header className="glass rounded-[28px] p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-teal-700 dark:text-teal-300 sm:text-sm">Instant voice workspace</p>
+              <h1 className="mt-2 text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Voice Clone Assistant</h1>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-3 self-start sm:self-auto">
-              <div className="rounded-3xl bg-slate-900/70 px-3 py-2 text-sm font-semibold text-slate-300">
-                Premium mode
-              </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center lg:justify-end">
+              <StatusPill label={status} className={statusTone} />
+              <StatusPill label={formatTime(seconds)} className="bg-slate-950/10 font-mono text-slate-900 dark:bg-white/10 dark:text-white" />
+              <StatusPill label={`${Math.round(micLevel * 100)}% mic`} className="bg-teal-500/15 text-teal-800 dark:text-teal-200" />
+              <button
+                type="button"
+                onClick={() => setDarkMode((value) => !value)}
+                className="glass-strong inline-flex min-h-11 items-center justify-center rounded-2xl px-3 text-2xl text-slate-800 transition hover:scale-[1.03] dark:text-white"
+                aria-label="Toggle dark mode"
+                title="Toggle dark mode"
+              >
+                {darkMode ? <MdLightMode /> : <MdDarkMode />}
+              </button>
             </div>
           </div>
         </header>
 
-        <section className="grid gap-5 xl:grid-cols-[0.9fr_1.4fr_0.9fr]">
-          <motion.aside
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-[36px] border-white/10 p-5 shadow-glass dark:border-white/10 sm:p-6"
-          >
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">Recording Status</p>
-                  <h2 className="mt-1 text-xl font-semibold text-white">{status}</h2>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-300 ring-1 ring-white/10">
-                  <MdRadioButtonChecked className="h-4 w-4 text-cyan-300" />
-                  {formatTime(seconds)}
-                </div>
-              </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.88fr_1.34fr_0.88fr]">
+          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[28px] p-4 sm:p-5">
+            <div className="grid grid-cols-2 gap-3">
+              <Metric label="Status" value={status} />
+              <Metric label="Timer" value={formatTime(seconds)} />
+            </div>
 
-              <div className="rounded-[28px] bg-slate-950/80 p-4 ring-1 ring-white/10">
-                <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
-                  <span>Mic level</span>
-                  <span>{Math.round(micLevel * 100)}%</span>
-                </div>
-                <div className="mt-3 h-4 overflow-hidden rounded-full bg-white/5">
-                  <motion.div
-                    animate={{ width: `${Math.max(10, Math.min(100, Math.round(micLevel * 100)))}%` }}
-                    transition={{ duration: 0.15 }}
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-fuchsia-400"
+            <div className="my-6 flex justify-center sm:my-8">
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : startRecording}
+                className={`relative flex h-32 w-32 items-center justify-center rounded-full text-6xl text-white shadow-2xl transition focus:outline-none focus:ring-4 focus:ring-teal-300 sm:h-40 sm:w-40 ${
+                  isRecording ? "bg-rose-500 animate-soft-pulse" : "bg-teal-600 hover:scale-[1.03]"
+                }`}
+                aria-label={isRecording ? "Stop recording" : "Start recording"}
+              >
+                {isRecording ? <span className="absolute inset-0 rounded-full border-8 border-white/20" /> : null}
+                <MdMic />
+              </button>
+            </div>
+
+            <div className="glass-strong rounded-3xl p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                <MdGraphicEq className="text-2xl text-teal-600 dark:text-teal-300" />
+                Mic input
+                <span className="ml-auto font-mono text-xs">{Math.round(micLevel * 100)}%</span>
+              </div>
+              <div className="flex h-24 items-center justify-center gap-1 overflow-hidden rounded-2xl bg-slate-950/5 px-3 dark:bg-white/5 sm:h-28">
+                {Array.from({ length: 34 }).map((_, index) => (
+                  <motion.span
+                    key={index}
+                    animate={{ height: isRecording ? 10 + micLevel * (22 + ((index * 9) % 58)) : 10 }}
+                    transition={{ duration: 0.12 }}
+                    className="w-1.5 rounded-full bg-gradient-to-t from-teal-500 to-rose-400"
                   />
-                </div>
-              </div>
-
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-cyan-500 text-white shadow-[0_35px_90px_rgba(34,211,238,0.22)] transition-all duration-300 ease-out sm:h-28 sm:w-28">
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className={`relative flex h-20 w-20 items-center justify-center rounded-full text-4xl transition focus:outline-none focus:ring-4 focus:ring-cyan-300 sm:h-24 sm:w-24 ${
-                    isRecording ? "animate-pulse-fast bg-rose-500" : "bg-cyan-500 hover:bg-cyan-400"
-                  }`}
-                  aria-label={isRecording ? "Stop recording" : "Start recording"}
-                >
-                  {isRecording ? <MdStop className="h-8 w-8" /> : <MdMic className="h-8 w-8" />}
-                </button>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={play}
-                  disabled={!hasTranscript}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <MdPlayArrow className="h-5 w-5" />
-                  Play
-                </button>
-                <button
-                  type="button"
-                  onClick={stop}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  <MdStop className="h-5 w-5" />
-                  Stop
-                </button>
-                <button
-                  type="button"
-                  onClick={pause}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  <MdPause className="h-5 w-5" />
-                  Pause
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { stop(); play(); }}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  <MdReplay className="h-5 w-5" />
-                  Replay
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadAudio}
-                  disabled={!originalBlob}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <MdDownload className="h-5 w-5" />
-                  Download
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void shareAudio()}
-                  disabled={!originalBlob}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <MdShare className="h-5 w-5" />
-                  Share
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-3xl bg-white/5 p-4 text-sm text-slate-300">
-                  <span>Silence stop</span>
-                  <input className="h-5 w-5 accent-cyan-400" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
-                </div>
-                <div className="flex items-center justify-between rounded-3xl bg-white/5 p-4 text-sm text-slate-300">
-                  <span>Auto playback</span>
-                  <input className="h-5 w-5 accent-cyan-400" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
-                </div>
+                ))}
               </div>
             </div>
+
+            {recognitionNotice ? (
+              <div className="mt-3 rounded-2xl border border-amber-300/40 bg-amber-200/18 p-3 text-sm font-semibold text-amber-900 dark:border-amber-200/20 dark:bg-amber-300/10 dark:text-amber-100">
+                {recognitionNotice}
+              </div>
+            ) : null}
+
+            {originalAudioUrl ? (
+              <audio className="mt-3 w-full rounded-2xl" controls src={originalAudioUrl} />
+            ) : null}
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <IconButton icon={<MdPlayArrow />} label="Start" onClick={startRecording} disabled={isRecording} />
+              <IconButton icon={<MdStop />} label="Stop" onClick={stopRecording} disabled={!isRecording} />
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <IconButton icon={<MdPlayArrow />} label="Play Recording" onClick={playRecording} disabled={!hasRecording} />
+              <IconButton icon={<MdDownload />} label="Save Recording" onClick={downloadAudio} disabled={!hasRecording} />
+              <IconButton icon={<MdShare />} label="Share Recording" onClick={() => void shareAudio()} disabled={!hasRecording} />
+            </div>
+
+            <label className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-white/38 p-3 text-sm font-semibold dark:bg-white/5">
+              Silence stop
+              <input className="h-5 w-5 accent-teal-700" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
+            </label>
+            <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/38 p-3 text-sm font-semibold dark:bg-white/5">
+              Auto playback
+              <input className="h-5 w-5 accent-teal-700" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
+            </label>
           </motion.aside>
 
           <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[28px] p-4 sm:p-5">
-            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Transcript</h2>
-                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-                  Speak into your mic, adjust the transcript, and use browser speech for instant playback.
-                </p>
+                <h2 className="text-2xl font-black">Transcript</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">Record, edit, then press Speak.</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <IconButton icon={<MdContentCopy />} label="Copy" onClick={copyTranscript} disabled={!transcript} />
@@ -794,7 +693,7 @@ export default function Home() {
                 setTranscript(event.target.value);
                 setInterimTranscript("");
               }}
-              className="min-h-[300px] w-full resize-none rounded-[32px] border border-slate-200 bg-white/85 p-5 text-base leading-relaxed outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-200/60 dark:border-white/10 dark:bg-slate-950/80 dark:text-white sm:min-h-[420px] sm:text-lg"
+              className="min-h-[280px] w-full resize-none rounded-3xl border border-white/50 bg-white/62 p-4 text-base leading-relaxed outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-300/35 dark:border-white/10 dark:bg-slate-950/35 sm:min-h-[390px] sm:p-5 sm:text-lg"
               placeholder="Your live transcript appears here. Edit it before generating speech."
               aria-label="Editable transcript"
             />
@@ -810,112 +709,63 @@ export default function Home() {
               type="button"
               onClick={generateSpeech}
               disabled={!hasTranscript}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[28px] bg-cyan-600 px-6 py-4 text-base font-black text-white transition hover:-translate-y-0.5 hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-sky-500 dark:text-slate-950"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-base font-black text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
             >
               <MdSave className="text-2xl" />
               Speak
             </button>
           </motion.section>
 
-          <motion.aside
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="glass rounded-[36px] border-white/10 p-5 shadow-glass dark:border-white/10 sm:p-6"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Voice Settings</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Core controls plus hidden advanced tuning.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((value) => !value)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                <span>{advancedOpen ? "Hide advanced" : "Show advanced"}</span>
-                <MdExpandMore className={`h-5 w-5 transition ${advancedOpen ? "rotate-180" : "rotate-0"}`} />
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-4">
+          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-[28px] p-4 sm:p-5">
+            <h2 className="mb-4 text-2xl font-black">Voice Settings</h2>
+            <div className="space-y-4">
               <Select label="Voice" value={voice.value} onChange={(value) => setVoice(voices.find((item) => item.value === value) ?? voices[0])} options={voices.map((item) => ({ label: `${item.label} - ${item.category}`, value: item.value }))} />
               <Select label="Language" value={language} onChange={setLanguage} options={languages} />
               <Select label="Accent" value={accent} onChange={setAccent} options={accents.map((item) => ({ label: item, value: item }))} />
+              <Slider label="Playback speed" value={speed} min={0.25} max={4} step={0.05} onChange={setSpeed} suffix="x" />
+              <Slider label="Pitch" value={pitch} min={-12} max={12} step={1} onChange={setPitch} />
+              <Slider label="Volume" value={volume} min={0} max={1} step={0.01} onChange={setVolume} suffix="%" display={(value) => Math.round(value * 100)} />
             </div>
 
-            <AnimatePresence initial={false}>
-              {advancedOpen ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-5 space-y-4">
-                    <Slider label="Playback speed" value={speed} min={0.25} max={4} step={0.05} onChange={setSpeed} suffix="x" />
-                    <Slider label="Pitch" value={pitch} min={-12} max={12} step={1} onChange={setPitch} />
-                    <Slider label="Volume" value={volume} min={0} max={1} step={0.01} onChange={setVolume} suffix="%" display={(value) => Math.round(value * 100)} />
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} />
+              <IconButton icon={<MdPause />} label="Pause" onClick={pause} />
+              <IconButton icon={<MdStop />} label="Stop" onClick={stop} />
+              <IconButton icon={<MdReplay />} label="Replay" onClick={() => { stop(); play(); }} />
+              <IconButton icon={<MdRefresh />} label="Resume" onClick={() => window.speechSynthesis.resume()} />
+              <IconButton icon={<MdPlayArrow />} label="Play Rec" onClick={playRecording} disabled={!hasRecording} />
+              <IconButton icon={<MdDownload />} label="Recording" onClick={downloadAudio} disabled={!hasRecording} />
+              <IconButton icon={<MdShare />} label="Share Rec" onClick={() => void shareAudio()} disabled={!hasRecording} />
+            </div>
           </motion.aside>
         </section>
 
         <section className="glass rounded-[28px] p-4 sm:p-5">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Recording History</h2>
-              <p className="mt-1 text-sm text-slate-400">Recent transcripts and recordings for quick access.</p>
-            </div>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-black">History</h2>
             <button
               type="button"
               onClick={() => persistHistory([])}
-              className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              className="inline-flex items-center gap-2 rounded-full bg-white/45 px-3 py-2 text-sm font-bold dark:bg-white/10"
             >
-              <MdDelete /> Clear all
+              <MdDelete /> Clear
             </button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <AnimatePresence initial={false}>
               {history.length === 0 ? (
-                <div className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 text-sm text-slate-400">
-                  Completed recordings will appear here with transcript, audio, and voice metadata.
-                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Completed recordings will appear here with transcript, original audio, and selected voice.</p>
               ) : (
                 history.map((item) => (
-                  <motion.article
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    key={item.id}
-                    className="glass-strong rounded-[28px] border border-white/10 p-5"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-300">Recording</p>
-                        <p className="mt-1 text-sm text-slate-400">{new Date(item.date).toLocaleDateString()}</p>
-                      </div>
-                      <span className="rounded-2xl bg-cyan-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                        {item.selectedVoice}
-                      </span>
+                  <motion.article layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} key={item.id} className="glass-strong rounded-3xl p-4">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="text-sm font-black">{new Date(item.date).toLocaleString()}</p>
+                      <span className="rounded-full bg-teal-500/15 px-2 py-1 text-xs font-bold text-teal-800 dark:text-teal-200">{item.selectedVoice}</span>
                     </div>
-                    <p className="line-clamp-3 text-sm leading-6 text-slate-300">{item.transcript}</p>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
-                        <MdPlayArrow className="h-4 w-4" /> Play
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
-                        <MdDownload className="h-4 w-4" /> Download
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
-                        <MdShare className="h-4 w-4" /> Share
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15">
-                        <MdDelete className="h-4 w-4" /> Delete
-                      </button>
+                    <p className="line-clamp-3 text-sm text-slate-700 dark:text-slate-200">{item.transcript}</p>
+                    <div className="mt-3 space-y-2">
+                      {item.originalAudio ? <audio className="w-full" controls src={item.originalAudio} /> : null}
+                      {item.generatedAudio ? <audio className="w-full" controls src={item.generatedAudio} /> : null}
                     </div>
                   </motion.article>
                 ))
@@ -925,10 +775,10 @@ export default function Home() {
         </section>
       </div>
 
-      <div className="fixed inset-x-4 bottom-4 z-40 grid grid-cols-3 gap-3 rounded-full border border-white/10 bg-slate-950/95 p-3 shadow-glass backdrop-blur-2xl lg:hidden">
+      <div className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-2 rounded-3xl border border-white/30 bg-white/75 p-2 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75 lg:hidden">
         <IconButton icon={isRecording ? <MdStop /> : <MdMic />} label={isRecording ? "Stop" : "Record"} onClick={isRecording ? stopRecording : startRecording} />
-        <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} disabled={!hasTranscript} />
-        <IconButton icon={<MdShare />} label="Share" onClick={() => void shareAudio()} disabled={!originalBlob} />
+        <IconButton icon={<MdPlayArrow />} label={hasTranscript ? "Speak" : "Play Rec"} onClick={hasTranscript ? play : playRecording} disabled={!hasTranscript && !hasRecording} />
+        <IconButton icon={<MdShare />} label="Share" onClick={() => void shareAudio()} disabled={!hasRecording} />
       </div>
     </main>
   );
