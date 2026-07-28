@@ -563,33 +563,40 @@ export default function Home() {
   return (
     <main className="min-h-screen px-3 py-4 sm:px-6 lg:px-8 lg:py-7">
       <Toaster position="top-right" toastOptions={{ className: "dark:bg-slate-900 dark:text-white" }} />
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 pb-24 sm:gap-5 lg:pb-0">
-        <header className="glass rounded-[28px] p-4 sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 pb-24 sm:gap-7 lg:pb-0">
+        <header className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-teal-700 dark:text-teal-300 sm:text-sm">Instant voice workspace</p>
-              <h1 className="mt-2 text-3xl font-black leading-tight text-slate-950 dark:text-white sm:text-5xl">Voice Clone Assistant</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-600 dark:text-sky-400 sm:text-sm">Instant voice workspace</p>
+              <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-5xl">Voice Clone Assistant</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+                Record audio from your browser, get instant live transcripts, and play back voice with polished browser speech synthesis.
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-              <StatusPill label={status} className={statusTone} />
-              <StatusPill label={formatTime(seconds)} className="bg-slate-950/10 font-mono text-slate-900 dark:bg-white/10 dark:text-white" />
-              <StatusPill label={`${Math.round(micLevel * 100)}% mic`} className="bg-teal-500/15 text-teal-800 dark:text-teal-200" />
-              <button
-                type="button"
-                onClick={() => setDarkMode((value) => !value)}
-                className="glass-strong inline-flex min-h-11 items-center justify-center rounded-2xl px-3 text-2xl text-slate-800 transition hover:scale-[1.03] dark:text-white"
-                aria-label="Toggle dark mode"
-                title="Toggle dark mode"
-              >
-                {darkMode ? <MdLightMode /> : <MdDarkMode />}
-              </button>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <StatusPill label={status} className={statusTone} />
+                <StatusPill label={formatTime(seconds)} className="bg-slate-950/10 font-mono text-slate-900 dark:bg-white/10 dark:text-white" />
+              </div>
+              <div className="flex flex-wrap items-center gap-3 justify-end">
+                <StatusPill label={`${Math.round(micLevel * 100)}% mic`} className="bg-sky-500/15 text-sky-900 dark:text-sky-200" />
+                <button
+                  type="button"
+                  onClick={() => setDarkMode((value) => !value)}
+                  className="glass-strong inline-flex h-12 w-12 items-center justify-center rounded-3xl text-2xl text-slate-800 transition hover:scale-[1.03] dark:text-white"
+                  aria-label="Toggle dark mode"
+                  title="Toggle dark mode"
+                >
+                  {darkMode ? <MdLightMode /> : <MdDarkMode />}
+                </button>
+              </div>
             </div>
           </div>
         </header>
 
-        <section className="grid gap-4 xl:grid-cols-[0.88fr_1.34fr_0.88fr]">
-          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[28px] p-4 sm:p-5">
+        <section className="grid gap-5 xl:grid-cols-[0.9fr_1.4fr_0.9fr]">
+          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
             <div className="grid grid-cols-2 gap-3">
               <Metric label="Status" value={status} />
               <Metric label="Timer" value={formatTime(seconds)} />
@@ -599,8 +606,8 @@ export default function Home() {
               <button
                 type="button"
                 onClick={isRecording ? stopRecording : startRecording}
-                className={`relative flex h-32 w-32 items-center justify-center rounded-full text-6xl text-white shadow-2xl transition focus:outline-none focus:ring-4 focus:ring-teal-300 sm:h-40 sm:w-40 ${
-                  isRecording ? "bg-rose-500 animate-soft-pulse" : "bg-teal-600 hover:scale-[1.03]"
+                className={`relative flex h-36 w-36 items-center justify-center rounded-full text-6xl text-white shadow-2xl transition focus:outline-none focus:ring-4 focus:ring-cyan-300 sm:h-44 sm:w-44 ${
+                  isRecording ? "bg-rose-500 animate-soft-pulse" : "bg-cyan-600 hover:scale-[1.03]"
                 }`}
                 aria-label={isRecording ? "Stop recording" : "Start recording"}
               >
@@ -609,19 +616,19 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="glass-strong rounded-3xl p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                <MdGraphicEq className="text-2xl text-teal-600 dark:text-teal-300" />
+            <div className="glass-strong rounded-[28px] p-4">
+              <div className="mb-3 flex items-center gap-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                <MdGraphicEq className="text-2xl text-cyan-500 dark:text-sky-400" />
                 Mic input
-                <span className="ml-auto font-mono text-xs">{Math.round(micLevel * 100)}%</span>
+                <span className="ml-auto font-mono text-xs text-slate-500 dark:text-slate-400">{Math.round(micLevel * 100)}%</span>
               </div>
-              <div className="flex h-24 items-center justify-center gap-1 overflow-hidden rounded-2xl bg-slate-950/5 px-3 dark:bg-white/5 sm:h-28">
+              <div className="flex h-24 items-center justify-center gap-1 overflow-hidden rounded-3xl bg-slate-950/10 px-3 dark:bg-white/10 sm:h-28">
                 {Array.from({ length: 34 }).map((_, index) => (
                   <motion.span
                     key={index}
                     animate={{ height: isRecording ? 10 + micLevel * (22 + ((index * 9) % 58)) : 10 }}
                     transition={{ duration: 0.12 }}
-                    className="w-1.5 rounded-full bg-gradient-to-t from-teal-500 to-rose-400"
+                    className="w-1.5 rounded-full bg-gradient-to-t from-cyan-400 via-sky-400 to-fuchsia-400"
                   />
                 ))}
               </div>
@@ -637,21 +644,23 @@ export default function Home() {
               <IconButton icon={<MdShare />} label="Share Recording" onClick={() => void shareAudio()} disabled={!originalBlob} />
             </div>
 
-            <label className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-white/38 p-3 text-sm font-semibold dark:bg-white/5">
+            <label className="mt-5 flex items-center justify-between gap-3 rounded-3xl bg-white/40 p-4 text-sm font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-300">
               Silence stop
-              <input className="h-5 w-5 accent-teal-700" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
+              <input className="h-5 w-5 accent-cyan-500" type="checkbox" checked={silenceStop} onChange={(event) => setSilenceStop(event.target.checked)} />
             </label>
-            <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/38 p-3 text-sm font-semibold dark:bg-white/5">
+            <label className="mt-3 flex items-center justify-between gap-3 rounded-3xl bg-white/40 p-4 text-sm font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-300">
               Auto playback
-              <input className="h-5 w-5 accent-teal-700" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
+              <input className="h-5 w-5 accent-cyan-500" type="checkbox" checked={autoPlayback} onChange={(event) => setAutoPlayback(event.target.checked)} />
             </label>
           </motion.aside>
 
           <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-[28px] p-4 sm:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-black">Transcript</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">Record, edit, then press Speak.</p>
+                <h2 className="text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Transcript</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                  Speak into your mic, adjust the transcript, and use browser speech for instant playback.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <IconButton icon={<MdContentCopy />} label="Copy" onClick={copyTranscript} disabled={!transcript} />
@@ -665,7 +674,7 @@ export default function Home() {
                 setTranscript(event.target.value);
                 setInterimTranscript("");
               }}
-              className="min-h-[280px] w-full resize-none rounded-3xl border border-white/50 bg-white/62 p-4 text-base leading-relaxed outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-300/35 dark:border-white/10 dark:bg-slate-950/35 sm:min-h-[390px] sm:p-5 sm:text-lg"
+              className="min-h-[300px] w-full resize-none rounded-[32px] border border-slate-200 bg-white/85 p-5 text-base leading-relaxed outline-none transition focus:border-cyan-400 focus:ring-4 focus:ring-cyan-200/60 dark:border-white/10 dark:bg-slate-950/80 dark:text-white sm:min-h-[420px] sm:text-lg"
               placeholder="Your live transcript appears here. Edit it before generating speech."
               aria-label="Editable transcript"
             />
@@ -681,15 +690,15 @@ export default function Home() {
               type="button"
               onClick={generateSpeech}
               disabled={!hasTranscript}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-base font-black text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[28px] bg-cyan-600 px-6 py-4 text-base font-black text-white transition hover:-translate-y-0.5 hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-sky-500 dark:text-slate-950"
             >
               <MdSave className="text-2xl" />
               Speak
             </button>
           </motion.section>
 
-          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-[28px] p-4 sm:p-5">
-            <h2 className="mb-4 text-2xl font-black">Voice Settings</h2>
+          <motion.aside initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-[36px] border-white/20 p-5 shadow-glass dark:border-white/10 sm:p-6">
+            <h2 className="mb-4 text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">Voice Settings</h2>
             <div className="space-y-4">
               <Select label="Voice" value={voice.value} onChange={(value) => setVoice(voices.find((item) => item.value === value) ?? voices[0])} options={voices.map((item) => ({ label: `${item.label} - ${item.category}`, value: item.value }))} />
               <Select label="Language" value={language} onChange={setLanguage} options={languages} />
@@ -699,7 +708,7 @@ export default function Home() {
               <Slider label="Volume" value={volume} min={0} max={1} step={0.01} onChange={setVolume} suffix="%" display={(value) => Math.round(value * 100)} />
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} />
               <IconButton icon={<MdPause />} label="Pause" onClick={pause} />
               <IconButton icon={<MdStop />} label="Stop" onClick={stop} />
@@ -746,7 +755,7 @@ export default function Home() {
         </section>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-2 rounded-3xl border border-white/30 bg-white/75 p-2 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75 lg:hidden">
+      <div className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-2 rounded-full border border-white/20 bg-white/90 p-3 shadow-glass backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/80 lg:hidden">
         <IconButton icon={isRecording ? <MdStop /> : <MdMic />} label={isRecording ? "Stop" : "Record"} onClick={isRecording ? stopRecording : startRecording} />
         <IconButton icon={<MdPlayArrow />} label="Speak" onClick={play} disabled={!hasTranscript} />
         <IconButton icon={<MdShare />} label="Share" onClick={() => void shareAudio()} disabled={!originalBlob} />
